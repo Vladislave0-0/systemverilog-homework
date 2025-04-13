@@ -25,30 +25,30 @@ module double_tokens
     // a -> 10010011000110100001100100
     // b -> 11011011110111111001111110
 
-    logic [7:0] one_count;
+    logic [7:0] ones_counter1;
     always_ff @(posedge clk) begin
         if (rst)  begin
-            { one_count, overflow } <= {'1, '0};
+            {ones_counter1, overflow} <= {'1, '0};
         end
-        else if (one_count >= 200) begin
+        else if (ones_counter1 >= 200) begin
             overflow <= '1;
         end
         else if (a) begin
-            one_count <= one_count + 1;
+            ones_counter1 <= ones_counter1 + 1;
         end
     end
 
-    logic [7:0] tmp2;
+    logic [7:0] ones_counter2;
     logic res;
     always_ff @(posedge clk) begin
         if (rst) begin
-            { tmp2, res } <= {'0, '0};
+            {ones_counter2, res} <= {'0, '0};
         end
         else if (a) begin
-            { tmp2, res } <= {tmp2 + '1, '1};
+            {ones_counter2, res} <= {ones_counter2 + '1, '1};
         end
-        else if (tmp2) begin
-            { tmp2, res } <= {tmp2 - '1, '1};
+        else if (ones_counter2) begin
+            {ones_counter2, res} <= {ones_counter2 - '1, '1};
         end
         else begin
             res <= '0;

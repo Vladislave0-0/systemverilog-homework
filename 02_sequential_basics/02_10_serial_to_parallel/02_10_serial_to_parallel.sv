@@ -26,5 +26,29 @@ module serial_to_parallel
     // Note:
     // Check the waveform diagram in the README for better understanding.
 
+    logic [$clog2(width) - 1:0] idx;    // $clog2(width) вычисляет минимальное количество бит, 
+                                        // необходимых для представления числа width.
+    logic [width-1:0] buff;
+    logic vld;
 
+    always_ff @(posedge clk) begin
+        if (rst) 
+            {idx, buff} <= {'0, '0};
+        else if (serial_valid) 
+            {idx, buff[idx]} <= {idx + 1'b1, serial_data};
+    end
+
+    always_ff @(posedge clk) begin
+        if (rst | vld) 
+            vld <= '0;
+        else if (serial_valid & (idx == width - 1)) 
+            vld <= '1;
+    end
+
+    assign parallel_valid = vld;
+
+    always_comb begin
+        if (vld) 
+            parallel_data = buff;
+    end
 endmodule
