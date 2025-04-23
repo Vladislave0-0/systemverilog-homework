@@ -36,93 +36,78 @@ module sort_floats_using_fsm (
     // The FLEN parameter is defined in the "import/preprocessed/cvw/config-shared.vh" file
     // and usually equal to the bit width of the double-precision floating-point number, FP64, 64 bits.
 
-   typedef enum logic [2:0] {
-        S0, 
-        S1, 
-        S2, 
-        S3, 
-        S4, 
-        S5
-    } fsm_state_t;
 
-    fsm_state_t current_state, next_state;
+    typedef enum logic [1:0] {IDLE, STATE0, STATE1, STATE2} state_t;
+    state_t curr_state, next_state;
 
-    always_ff @(posedge clk) begin
-        if (rst)
-            current_state <= S0;
-        else
-            current_state <= next_state;
-    end
+    logic [0:2][FLEN-1:0] current_values, next_values;
+    logic error_flag, next_error_flag;
 
-    logic err1, err2, err3;
+    assign busy = (curr_state != IDLE);
 
-    always_comb begin
-        next_state = current_state;
-
-        case (current_state)
-            S0: if (valid_in) next_state = S1;
-            S1: next_state = S2;
-            S2: next_state = S3;
-            S3: next_state = S4;
-            S4: next_state = S5;
-            S5: next_state = S0;
-        endcase
-    end
-
-    always_ff @(posedge clk) begin
+    always_ff @(posedge clk or posedge rst) begin
         if (rst) begin
-            valid_out <= 1'b0;
-            err1      <= 1'b0;
-            err2      <= 1'b0;
-            err3      <= 1'b0;
-        end 
-        else begin
-            case (current_state)
-                S1: sorted <= unsorted;
-                S2: begin
-                    f_le_a <= sorted[0];
-                    f_le_b <= sorted[1];
-
-                    if (~f_le_res) begin
-                        sorted[0] <= sorted[1];
-                        sorted[1] <= sorted[0];
-                    end
-
-                    if (f_le_err) err1 <= 1'b1;
-                end
-                S3: begin
-                    f_le_a <= sorted[1];
-                    f_le_b <= sorted[2];
-
-                    if (~f_le_res) begin
-                        sorted[1] <= sorted[2];
-                        sorted[2] <= sorted[1];
-                    end
-
-                    if (f_le_err)
-                        err2 <= 1'b1;
-                end
-                S4: begin
-                    f_le_a <= sorted[0];
-                    f_le_b <= sorted[1];
-
-                    if (~f_le_res) begin
-                        sorted[0] <= sorted[1];
-                        sorted[1] <= sorted[0];
-                    end
-
-                    if (f_le_err) err3 <= 1'b1;
-                end
-                S5: begin
-                    if (f_le_err) err3 <= 1'b1;
-
-                    valid_out <= 1'b1;
-                end
-            endcase
+            curr_state <= IDLE;
+            current_values <= '0;
+            error_flag <= 0;
+        end else begin
+            curr_state <= next_state;
+            current_values <= next_values;
+            error_flag <= next_error_flag;
         end
     end
 
-    assign err = err1 | err2 | err3;
-    assign busy = (current_state != S0) && (current_state != S5);
+    always_comb begin
+        next_state = curr_state;
+        next_values = current_values;
+        f_le_a = '0;
+        f_le_b = '0;
+        valid_out = 0;
+        err = 0;
+        next_error_flag = error_flag;
+
+        case (curr_state)
+            IDLE: begin
+                if (valid_in) begin
+                    next_values = unsorted;
+                    next_state = STATE0;
+                    next_error_flag = 0;
+                end
+            end
+            STATE0: begin
+                f_le_a = current_values[0];
+                f_le_b = current_values[1];
+                if (!f_le_res) begin
+                    next_values[0] = current_values[1];
+                    next_values[1] = current_values[0];
+                end
+                next_state = STATE1;
+                next_error_flag = error_flag || (valid_in && (curr_state != IDLE)) || f_le_err;
+            end
+            STATE1: begin
+                f_le_a = current_values[1];
+                f_le_b = current_values[2];
+                if (!f_le_res) begin
+                    next_values[1] = current_values[2];
+                    next_values[2] = current_values[1];
+                end
+                next_state = STATE2;
+                next_error_flag = error_flag || (valid_in && (curr_state != IDLE)) || f_le_err;
+            end
+            STATE2: begin
+                f_le_a = current_values[0];
+                f_le_b = current_values[1];
+                if (!f_le_res) begin
+                    next_values[0] = current_values[1];
+                    next_values[1] = current_values[0];
+                end
+                valid_out = 1;
+                sorted = next_values;
+                err = next_error_flag || (valid_in && (curr_state != IDLE)) || f_le_err;
+                next_state = IDLE;
+                next_error_flag = error_flag || (valid_in && (curr_state != IDLE)) || f_le_err;
+            end
+        endcase
+    end
 
 endmodule
