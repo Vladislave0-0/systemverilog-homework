@@ -1,7 +1,3 @@
-//----------------------------------------------------------------------------
-// Task
-//----------------------------------------------------------------------------
-
 module formula_2_pipe
 (
     input         clk,
@@ -16,91 +12,100 @@ module formula_2_pipe
     output [31:0] res
 );
 
-    // Task:
-    //
-    // Implement a pipelined module formula_2_pipe that computes the result
-    // of the formula defined in the file formula_2_fn.svh.
-    //
-    // The requirements:
-    //
-    // 1. The module formula_2_pipe has to be pipelined.
-    //
-    // It should be able to accept a new set of arguments a, b and c
-    // arriving at every clock cycle.
-    //
-    // It also should be able to produce a new result every clock cycle
-    // with a fixed latency after accepting the arguments.
-    //
-    // 2. Your solution should instantiate exactly 3 instances
-    // of a pipelined isqrt module, which computes the integer square root.
-    //
-    // 3. Your solution should save dynamic power by properly connecting
-    // the valid bits.
-    //
-    // You can read the discussion of this problem
-    // in the article by Yuri Panchul published in
-    // FPGA-Systems Magazine :: FSM :: Issue ALFA (state_0)
-    // You can download this issue from https://fpga-systems.ru/fsm#state_0
+    logic [31:0] b_squared, a_temp, c_temp;
+    logic [31:0] four_ac;
+    logic [31:0] discriminant;
 
-    logic [31:0] a_res;
-    logic [31:0] b_res;
-    logic [31:0] c_res;
+    logic vld1, vld2, vld3;
 
-    // shift register for b
-    logic [31:0] b_shift [0:15];
-    always_ff @(posedge clk)
-    begin
-        b_shift[0] <= b;
-        for(int i = 1; i < 16; ++i)
-	        b_shift[i] <= b_shift[i - 1];
+    always_ff @(posedge clk) begin
+        if (arg_vld) begin
+            b_squared <= b * b;
+            a_temp <= a;
+            c_temp <= c;
+        end
+        vld1 <= arg_vld;
     end
 
-    // shift register for a
-    logic [31:0] a_shift [0:32];
-    always_ff @(posedge clk)
-    begin
-        a_shift[0] <= a;
-        for(int i = 1; i < 33; ++i)
-	        a_shift[i] <= a_shift[i - 1];
+    always_ff @(posedge clk) begin
+        if (vld1) begin
+            four_ac <= 4 * a_temp * c_temp;
+        end
+        vld2 <= vld1;
     end
 
-    // register for valid data of c
-    logic c_vld;
-    logic c_vld_ff;
-    always_ff @(posedge clk)
-        if(rst)
-	        c_vld_ff <= 1'b0;
-        else
-	        c_vld_ff <= c_vld;
-
-    // register for b + sqrt(c)
-    logic [31:0] bc_sum;
-    always_ff @(posedge clk)
-        if(c_vld)
-	        bc_sum <= c_res + b_shift[15];
-
-    // register for valid data of sqrt(b + sqrt(c))
-    logic b_vld;
-    logic b_vld_ff;
-    always_ff @(posedge clk)
-        if(rst)
-	        b_vld_ff <= 1'b0;
-        else
-	        b_vld_ff <= b_vld;
-
-
-
-    // register for a + sqrt(b + sqrt(c))
-    logic [31:0] abc_sum;
-    always_ff @(posedge clk)
-        if(b_vld)
-	        abc_sum <= b_res + a_shift[32];
-
-    isqrt i1(.clk(clk), .rst(rst), .x_vld(arg_vld),  .x(c),       .y_vld(c_vld), .y(c_res));
-    isqrt i2(.clk(clk), .rst(rst), .x_vld(c_vld_ff), .x(bc_sum),  .y_vld(b_vld), .y(b_res));
-    isqrt i3(.clk(clk), .rst(rst), .x_vld(b_vld_ff), .x(abc_sum), .y_vld(a_vld), .y(a_res));
-
-    assign res = a_res;
-    assign res_vld = a_vld;
+    always_ff @(posedge clk) begin
+        if (vld2) begin
+            discriminant <= b_squared - four_ac;
+        end
+        vld3 <= vld2;
+    end
+    
+    assign res = discriminant;
+    assign res_vld = vld3;
 
 endmodule
+
+
+// СДАЧА ЗАДАНИЯ
+// module formula_2_pipe
+// (
+//     input               clk,
+//     input               rst,
+
+//     input               arg_vld,
+//     input  signed [31:0] a,
+//     input  signed [31:0] b,
+//     input  signed [31:0] c,
+
+//     output              res_vld,
+//     output signed [31:0] res
+// );
+
+//     logic signed [31:0] a_s0, b_s0, c_s0;
+//     logic                vld_s0;
+//     always_ff @(posedge clk or posedge rst) begin
+//         if (rst) begin
+//             vld_s0 <= 1'b0;
+//         end else begin
+//             vld_s0 <= arg_vld;
+//         end
+//         if (arg_vld) begin
+//             a_s0 <= a;
+//             b_s0 <= b;
+//             c_s0 <= c;
+//         end
+//     end
+
+//     logic signed [31:0] b2_s1, ac_s1, a_tmp;
+//     logic                vld_s1;
+//     always_ff @(posedge clk or posedge rst) begin
+//         if (rst) begin
+//             vld_s1 <= 1'b0;
+//         end else begin
+//             vld_s1 <= vld_s0;
+//         end
+//         if (vld_s0) begin
+//             b2_s1 <= b_s0 * b_s0;
+//             ac_s1 <= a_s0 * c_s0;
+//             a_tmp <= a_s0;
+//         end
+//     end
+
+//     logic signed [31:0] d_s2;
+//     logic                vld_s2;
+//     always_ff @(posedge clk or posedge rst) begin
+//         if (rst) begin
+//             vld_s2 <= 1'b0;
+//         end else begin
+//             vld_s2 <= vld_s1;
+//         end
+//         if (vld_s1) begin
+//             d_s2 <= b2_s1 - (ac_s1 <<< 2) + a_tmp;
+//         end
+//     end
+
+//     assign res     = d_s2;
+//     assign res_vld = vld_s2;
+
+// endmodule
